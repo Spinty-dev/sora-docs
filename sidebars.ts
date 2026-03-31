@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'index',
         'SORA_architecture_v4_4',
+        'architecture/packet_lifecycle',
       ],
     },
     {

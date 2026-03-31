@@ -30,18 +30,33 @@ sequenceDiagram
     end
 ```
 
-### Визуализация: State Transition (Extended)
+### Визуализация: State Machine (Extended)
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> SCANNING: start_scan
+    IDLE --> INIT: load_profile
+    INIT --> SCANNING: start_scan
+    
     SCANNING --> ATTACKING: target_found
     ATTACKING --> SCANNING: capture_complete / timeout
-    SCANNING --> REPORTING: request_report
-    ATTACKING --> ERROR: hardware_failure / socket_error
+    
+    ATTACKING --> ERROR: hardware_failure / hostapd_crash
     SCANNING --> ERROR: nl80211_conflict
-    ERROR --> IDLE: manual_reset
+    
+    ERROR --> CLEANUP: auto_start
+    CLEANUP --> IDLE: manual_reset
+    
+    SCANNING --> REPORTING: request_report
     REPORTING --> IDLE: finish_report
+    
+    state CLEANUP {
+        [*] --> StopAttacks
+        StopAttacks --> UnlockChannel
+        UnlockChannel --> ClosePCAP
+        ClosePCAP --> SyncDB
+        SyncDB --> NotifyPlugins
+        NotifyPlugins --> [*]
+    }
 ```
 
 ### Разделение обязанностей:
@@ -84,5 +99,21 @@ Rust-поток `sora-packet-engine` полностью независим от 
 | **REPORTING** | Генерация финального отчета | `IDLE` |
 | **ERROR** | Критическая ошибка (Hardware/Driver) | `IDLE` (после Reset) |
 
-> [!IMPORTANT]  
-> **Strict Technical Detail**: Любой переход состояния фиксируется в `_transition_log` с точностью до микросекунд (`time.time()`). Это позволяет проводить пост-эксплуатационный анализ (forensics) действий аудитора.
+## 3. Отказоустойчивость (Fault Tolerance)
+
+SORA спроектирована по принципу предотвращения "подвешенного" состояния системы.
+
+### Обработка падения `hostapd`
+Если процесс `hostapd`, запущенный `ConfigManager`, завершается аварийно:
+1. Плагин/Менеджер детектирует завершение по PID-файлу или `SIGCHLD`.
+2. В шину IPC отправляется событие `adapter_error`.
+3. `AttackController` немедленно вызывает `enter_error("hostapd_failure")`.
+4. Запускается **CLEANUP**, который гарантированно освобождает интерфейс.
+
+### Обработка переполнения IPC очереди
+Если Python-слой лагает (например, тяжелый парсинг SQLite) и очередь `crossbeam` переполняется:
+- **Rust Side**: Выбрасывает старые `BeaconFrame` события, но сохраняет `EapolFrame` в буфере на 5мс.
+- **Python Side**: `StatusPanel` в TUI отображает рост `IPC drops`. Это сигнал оператору о необходимости оптимизации дисковой подсистемы.
+
+> [!CAUTION]  
+> **Strict Technical Note**: При переходе в состояние `ERROR` на очистку отводится строго **3.0 секунды**. Если по какой-то причине очистка не завершилась, SORA выполняет форсированный выход (`sys.exit`), полагаясь на автоматический Cleanup ядра Linux для открытых PCAP-файлов и raw-сокетов.
