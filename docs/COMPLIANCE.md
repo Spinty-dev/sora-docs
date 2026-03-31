@@ -24,7 +24,7 @@ English | [Русский](#ru-соответствие-информационн
 ### 5. Stealth vs. Clandestine Operation
 - **Purpose of StealthEngine**: The traffic obfuscation features (OUI spoofing, interval jitter) are designed to test the effective detection range and sensitivity of **Wireless Intrusion Detection Systems (WIDS/IDS)**.
 - **Hardware Agnosticism**: SORA is a software framework that operates via standard operating system network interfaces (`AF_PACKET`, `nl80211`). It does not require or include hardware modifications that transform common Wi-Fi adapters into clandestine surveillance devices.
-- **Non-Clandestine Nature**: SORA is an interactive auditing tool and does not provide "secret" or "hidden" installation/operation modes. It is not intended for clandestine information gathering (Ref: [Disclaimer](../DISCLAIMER.md#6-special-technical-means-stm--clandestine-surveillance)).
+- **Non-Clandestine Nature**: SORA is an interactive auditing tool and does not provide "secret" or "hidden" installation/operation modes. It is not intended for clandestine information gathering (Ref: [Disclaimer](./DISCLAIMER.md#6-special-technical-means-stm--clandestine-surveillance)).
 
 ---
 
@@ -48,4 +48,4 @@ English | [Русский](#ru-соответствие-информационн
 ### 5. Скрытность vs Негласное использование
 - **Назначение StealthEngine**: Функции маскировки трафика (OUI-спуфинг, джиттер интервалов) предназначены для проверки эффективной дальности и чувствительности **систем обнаружения вторжений (WIDS/IDS)**.
 - **Стандартные интерфейсы**: SORA работает исключительно со стандартными сетевыми интерфейсами ОС (`AF_PACKET`, `nl80211`). ПО не требует и не содержит аппаратных модификаций, превращающих обычные Wi-Fi адаптеры в устройства для негласного наблюдения.
-- **Открытый характер работы**: SORA является интерактивным инструментом аудита и не предусматривает скрытых режимов установки или работы. ПО не предназначено для негласного получения информации (См: [Дисклеймер](../DISCLAIMER.md#6-специальные-технические-средства-стс)).
+- **Открытый характер работы**: SORA является интерактивным инструментом аудита и не предусматривает скрытых режимов установки или работы. ПО не предназначено для негласного получения информации (См: [Дисклеймер](./DISCLAIMER.md#6-специальные-технические-средства-стс)).

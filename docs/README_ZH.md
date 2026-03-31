@@ -1,13 +1,13 @@
 # SORA — 信号攻防无线审计器 (Signals Offensive Radio Auditor)
 
-[English](../README.md) | [Русский](README_RU.md) | 中文
+[English](./index.md) | [Русский](README_RU.md) | 中文
 
 ---
 
 **SORA** 是一个用于无线网络 (Wi-Fi) 深度审计和渗透测试的高性能框架。SORA 专注于超低抖动、隐蔽性和最大的灵活性，在系统层面结合了 Rust 的强大性能和 Python 的编排灵活性。
 
 > [!CAUTION]
-> **警告：** 本工具仅用于教育目的和授权安全审计。在使用前，请阅读 [法律免责声明](../DISCLAIMER.md)。
+> **警告：** 本工具仅用于教育目的和授权安全审计。在使用前，请阅读 [法律免责声明](./DISCLAIMER.md)。
 
 ---
 
@@ -60,13 +60,13 @@ cd SORA
 
 ## 🏗 架构说明
 
-关于内部实现、IPC 方案和攻击引擎逻辑的详细文档，请参阅 [SORA Architecture v4.4](../SORA_architecture_v4_4.md)。有关无线审计标准及合规性的信息，请参阅 [合规性与标准](COMPLIANCE.md)。
+关于内部实现、IPC 方案和攻击引擎逻辑的详细文档，请参阅 [SORA Architecture v4.4](./SORA_architecture_v4_4.md)。有关无线审计标准及合规性的信息，请参阅 [合规性与标准](COMPLIANCE.md)。
 
 ---
 
 ## ⚖️ 许可协议
 
-- **核心与 Python 层**: [GNU GPL v3](../LICENSE)。
+- **核心与 Python 层**: [GNU GPL v3](./LICENSE.md)。
 - **插件**: [MIT](../plugins/LICENSE) — 为您的扩展提供完全自由。
 
 ---
