@@ -1,115 +1,99 @@
-# Подсистема PacketEngine и Парсинг трафика
+# PacketEngine & AF_PACKET Deep Dive
 
-`PacketEngine` — это центральный узел (core orchestrator) 네트워크-слоя SORA, ответственный за непрерывный захват 802.11 кадров без блокировки основного Python-процесса. 
+Этот раздел описывает низкоуровневую реализацию захвата и инъекции пакетов в SORA. Архитектура ориентирована на минимальные задержки (low-latency) и прямое взаимодействие с сетевым стеком ядра Linux через семейство сокетов `AF_PACKET`.
 
-Философия дизайна `PacketEngine` строится на двух принципах:
-1. **Zero-Allocation**: Сниффер не выделяет память в куче (heap) при парсинге кадров. Вся обработка идет через слайсы `&[u8]`.
-2. **Блокирующее чтение в выделенном потоке (Dedicated OS Thread)**: Чтение сырого сокета намеренно оставлено блокирующим, чтобы избежать CPU starvation.
+## 1. Zero-Copy Philosophy
 
-## 1. Инициализация сырого сокета (`af_packet.rs`)
+В SORA минимизация копирования данных между адресными пространствами является приоритетом. 
 
-Ядро Linux предоставляет семейство `AF_PACKET` для обхода стандартного сетевого стека (TCP/IP). SORA использует `SockProtocol::EthAll` (соответствует `ETH_P_ALL`), что позволяет захватывать абсолютно все 802.11 кадры на интерфейсе.
+### Визуализация: Hardware Path & Frame Anatomy
+```mermaid
+graph TD
+    Antenna((Antenna)) -->|Raw Radio| DMA[DMA Controller]
+    DMA -->|PCIe/USB| Driver[mac80211 Driver]
+    Driver -->|sk_buff| Kernel[Linux Networking Stack]
+    Kernel -->|AF_PACKET| SORA_Rust[SORA Rust Core]
+    SORA_Rust -->|MPSC| SORA_Python[SORA Python Orchestrator]
 
-```rust
-// core/src/engine/af_packet.rs
-pub fn new(interface: &str) -> Result<Self, SocketError> {
-    let fd = socket(
-        AddressFamily::Packet,
-        SockType::Raw,
-        SockFlag::empty(),
-        SockProtocol::EthAll, // Захват всех протоколов 2-го уровня
-    ).map_err(SocketError::OpenFailed)?;
-
-    // ... Получение ifindex и вызов libc::bind ...
-}
+    subgraph "The Anatomy of a Frame (IEEE 802.11)"
+        Header[MAC Header: 24-30 bytes] --- Body[Frame Body: 0-2312 bytes]
+        Body --- FCS[FCS: 4 bytes]
+    end
 ```
+
+### Механизм передачи данных:
+1. **Ядро ➔ Драйвер**: Пакеты поступают в кольцевой буфер (Ring Buffer) сетевой карты.
+2. **Драйвер ➔ PacketEngine**: Вызов `libc::recv` копирует данные из буфера ядра в предварительно аллоцированный стек-буфер `buf: [u8; 4096]` (см. `packet_engine.rs:L76`).
+3. **PacketEngine ➔ Parser**: Парсинг выполняется над срезом (slice) этого же буфера без аллокаций в куче.
+4. **Parser ➔ SoraEvent**: Если фрейм релевантен (например, EAPOL), создается `SoraEvent`. Поле `data: Vec<u8>` — это единственное место, где происходит аллокация в куче для передачи владения данными в Python-слой.
 
 > [!NOTE]  
-> Операция привязки (`bind`) `AF_PACKET` сокета требует привилегий `CAP_NET_RAW` или `root` доступа. Поэтому SORA должна запускаться с использованием `sudo`, после чего происходит "Privilege Drop" для Python-слоя.
+> В Phase 4 планируется внедрение `PACKET_RX_RING` (mmap), что позволит полностью исключить копирование `recv` и читать пакеты напрямую из разделяемой памяти между ядром и SORA.
 
-### Чтение без оверхеда
+## 2. AF_PACKET: Низкоуровневая реализация
 
-Чтение кадра происходит напрямую в предварительно аллоцированный буфер `[u8; 4096]` на стеке потока. Этого размера с запасом хватает для максимального 802.11 фрейма (обычно ~2346 байт).
+SORA взаимодействует с сетевым стеком через интерфейс `libc`. Использование `AF_PACKET` позволяет обходить уровень протоколов L3/L4.
 
-```rust
-pub fn recv(&self, buf: &mut [u8]) -> Result<usize, SocketError> {
-    let res = unsafe {
-        libc::recv(self.fd.as_raw_fd(), buf.as_mut_ptr() as *mut libc::c_void, buf.len(), 0)
-    };
-    Ok(res as usize)
-}
+### Инициализация сокета (af_packet.rs:L30)
+
+Функция `RawSocket::new` выполняет следующие шаги:
+
+1. **Создание дескриптора**:
+   ```rust
+   libc::socket(AF_PACKET, SOCK_RAW, ETH_P_ALL.to_be())
+   ```
+   Флаг `ETH_P_ALL` указывает ядру передавать нам **все** Ethernet-фреймы (включая Radiotap, если интерфейс в Monitor Mode).
+
+2. **Маппинг интерфейса**:
+   Вызов `libc::if_nametoindex` преобразует имя (например, `wlan0mon`) в целочисленный индекс `ifindex`, необходимый ядру.
+
+3. **Связывание (Binding)**:
+   Используется структура `libc::sockaddr_ll` (Link Layer address).
+   ```rust
+   struct sockaddr_ll {
+       sll_family:   u16,     // AF_PACKET
+       sll_protocol: u16,     // ETH_P_ALL
+       sll_ifindex:  i32,     // Индекс интерфейса
+       sll_hatype:   u16,     // Тип заголовка (ARPHRD_IEEE80211)
+       sll_pkttype:  u8,      // Тип пакета (PACKET_OTHERHOST)
+       sll_halen:    u8,      // Длина адреса
+       sll_addr:     [u8; 8], // Физический адрес
+   };
+   ```
+   SORA заполняет `sll_ifindex` и `sll_protocol`, вызывая `libc::bind`. Это гарантирует, что сокет привязан только к целевому адаптеру.
+
+## 3. Спецификация 802.11 Parsing (IEEE 802.11-2020)
+
+Парсинг в `parsers.rs` опирается на фиксированные смещения стандарта. SORA предполагает наличие Radiotap-заголовка (обычно 24-36 байт, определяется динамически).
+
+### Смещения MAC-заголовка (от начала 802.11 фрейма)
+
+| Смещение (байт) | Длина | Поле | Стандарт | Описание |
+| :--- | :--- | :--- | :--- | :--- |
+| **0** | 2 | **Frame Control** | §9.2.4.1 | Тип, подтип и флаги фрейма |
+| **2** | 2 | **Duration/ID** | §9.2.4.2 | Время занятия среды |
+| **4** | 6 | **Address 1** | §9.2.4.3 | RA (Receiver Address) |
+| **10** | 6 | **Address 2** | §9.2.4.3 | TA (Transmitter Address) |
+| **16** | 6 | **Address 3** | §9.2.4.3 | BSSID |
+| **22** | 2 | **Sequence Control** | §9.2.4.4 | Номер фрагмента и последовательности |
+
+### Разбор Frame Control Field (16 бит)
+
+```text
+Bits:  0-1    2-3      4-7    8    9    10   11   12   13   14   15
+Field: Ver  Type    Subtype  ToDS FrDS More Frag Retry Pwr  More Prot Order
 ```
 
-## 2. Главный Worker-поток (`packet_engine.rs`)
+**Логика SORA:**
+- `Type == 00` (Management) + `Subtype == 1000` (Beacon) ➔ `ParsedFrame::Beacon`.
+- `Type == 10` (Data) + `Subtype == 0000` (Data) + наличие LLC/SNAP ➔ проверка на EAPOL (Type 0x888E).
 
-Функция `start` создает новый поток уровня ОС, цикл которого является единственным потребителем сырого сокета.
+## 4. Инъекция пакетов (TX Path)
 
-### Non-blocking Command Bus
-Пока сокет блокируется на `recv`, поток также проверяет MPSC-канал для команд оркестрации с использованием `try_recv()`.
+Вызов `RawSocket::send` (см. `af_packet.rs:L85`) является прямой оберткой над системным вызовом `libc::send`. 
+1. Пакет не проходит через таблицу маршрутизации.
+2. Пакет не фрагментируется ядром.
+3. Драйвер добавляет FCS (Frame Check Sequence) автоматически, если не указано иное через `IEEE80211_TX_CTL_NO_FCS`.
 
-```rust
-// core/src/engine/packet_engine.rs
-while let Ok(cmd) = cmd_rx.try_recv() {
-    match cmd {
-        SoraCommand::Shutdown => break, // Выход из потока сниффера
-        SoraCommand::LockChannel { channel } => { ... } // Блокировка перехвата канала
-        // ...
-    }
-}
-```
-
-### Маршрутизация кадров (Event Routing)
-
-Как только `socket.recv` возвращает сырой байт-слайс, он немедленно отправляется в Pcap-очередь (если настроено создание дампа) и передается в `parsers::parse_frame`.
-В зависимости от типа распознанного фрейма, `PacketEngine` оборачивает его в enum `SoraEvent` и отправляет в Python عبر `EventChannel`.
-
-```rust
-let frame = &buf[..len];
-pcap_writer.enqueue(frame);
-
-match parse_frame(frame) {
-    ParsedFrame::Eapol { bssid, client, step, data } => {
-        // Сигнал передается в Python-FSM для учета хэндшейков
-        event_channel.send(SoraEvent::EapolFrame {
-            api_version: API_VERSION,
-            bssid, client, step, data: data.to_vec(),
-        });
-    }
-    // ...
-}
-```
-
-## 3. Парсинг заголовков (`parsers.rs`)
-
-Модуль парсинга реализован как strict state machine, последовательно считывающая 802.11 (Radiotap + MAC Headers) без копирования. Возвращается объект `ParsedFrame<'a>`, который ссылается на изначальный буфер `buf`.
-
-```rust
-pub enum ParsedFrame<'a> {
-    Beacon { bssid: [u8; 6], ssid: &'a [u8], channel: u8, rssi: i8 },
-    Eapol { bssid: [u8; 6], client: [u8; 6], step: u8, data: &'a [u8] },
-    Pmkid { bssid: [u8; 6], client: [u8; 6], pmkid: [u8; 16] },
-    Unknown,
-}
-```
-
-### Извлечение EAPOL и PMKID
-`parse_data()` является наиболее сложной частью. Она определяет тип кадра `fc = u16::from_le_bytes([frame[0], frame[1]])` и проверяет EtherType LLC инкапсуляции. Если `ethertype == 0x888E`, кадр распознается как EAPOL.
-
-Для детектирования хэндшейков, парсер анализирует EAPOL Key Information:
-
-```rust
-let key_info = u16::from_be_bytes([frame[eapol_start + 5], frame[eapol_start + 6]]);
-let ack = (key_info & 0x0080) != 0;
-let mic = (key_info & 0x0100) != 0;
-let secure = (key_info & 0x0200) != 0;
-
-let step = match (ack, mic, secure) {
-    (true, false, false) => 1, // M1
-    (false, true, false) => 2, // M2
-    (true, true, true) => 3,   // M3
-    (false, true, true) => 4,  // M4
-    _ => 0,
-};
-```
-
-Сразу же после определения кадра `M1`, SORA итеративно проходит по OUI Information Elements в поиске PMKID (`OUI 00:0F:AC, Type 4`). Если PMKID обнаружен, он извлекается (`16 байт`) и немедленно пробрасывается в Event Channel.
+> [!IMPORTANT]  
+> Операция инъекции синхронна. Для соблюдения таймингов Phase 4 (Karma) используется `crossbeam` канал с приоритетом, чтобы `TxDispatch` поток не блокировал логику `PacketEngine`.

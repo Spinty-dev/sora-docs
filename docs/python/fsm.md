@@ -1,53 +1,88 @@
-# Машина Состояний (AttackController FSM)
+# AttackController & The GIL Escape
 
-Машинное состояние (FSM) в `AttackController` — это единственный легальный способ перехода между этапами работы (сканирование, захват хэндшейков, симуляция Evil Twin).
+Этот раздел документирует высокоуровневую логику управления SORA и архитектурное решение по обходу ограничений Global Interpreter Lock (GIL) в Python.
 
-Использование строгой FSM гарантирует, что при критической ошибке драйвера адаптера (или, например, отсоединении антенны) система не оставит висящие процессы `hostapd` и зависшие Netlink блокировки.
+## 1. Архитектура "The GIL Escape"
 
-## Граф Переходов (State Machine Flow)
+Одной из главных проблем при разработке производительных инструментов на Python является GIL, который не позволяет выполнять байт-код Python параллельно в нескольких системных потоках. SORA решает эту проблему путем выноса всей "тяжелой" работы в нативное Rust-ядро.
 
-В SORA 4 состояния, между которыми двигается оркестратор. Состояние `Attacking` в Phase 4 (Advanced Auditing Engines) делится на подсостояния.
-
+### Визуализация: GIL Escape
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle
+sequenceDiagram
+    participant P as Python (Event Loop)
+    participant R as Rust (Native Thread)
+    participant C as Crossbeam Channel
     
-    Idle --> Scanning : User starts target search
-    Scanning --> Attacking : BSSID Found / Time Exceeded
+    Note over P, R: SORA Startup (GIL Shared)
+    R->>R: spawn_native_thread()
+    Note over R: Running outside GIL context
     
-    state Attacking {
-        [*] --> Passive : Monitor Only
-        Passive --> Deauth : Active Packet Gen
-        Passive --> EvilTwin : Wait Beacon (Phase 4)
-        EvilTwin --> Karma : Interactive (Phase 4)
-    }
+    loop Real-time Capture
+        R->>R: poll_af_packet()
+        R->>R: parse_80211()
+        R->>C: push(SoraEvent)
+    end
     
-    Attacking --> Scanning : Handshake captured / Probe Timeout
-    Attacking --> Reporting : User Stop Command
-    Scanning --> Reporting : User Stop Command
-    
-    Attacking --> Error : Adapter Kernel Panic / Nl80211 Fail
-    Scanning --> Error : Interface detached
-    Error --> Reporting : Crash Dump Generation
-    
-    Reporting --> [*]
+    loop Event Processing
+        P->>C: poll_high()
+        C-->>P: SoraEvent (PyDict)
+        P->>P: update_tui()
+    end
 ```
 
-> [!CAUTION]  
-> **Strict Compliance Statement (Cleanup Protocol):**  
-> При любом переходе в состояние `Reporting` или возникновении `Error`, Python-цикл выполняет так называемую Graceful Cleanup (событие `TearDown`). Уничтожаются все запущенные `subprocess.Popen` от `hostapd`, отзывается `AAL::unlock_channel()`, а `iptables` сбрасывается (`-D` правила). Это критически важно, чтобы после аудита чужой или своей инфраструктуры она не осталась в скомпрометированном неработоспособном состоянии.
+### Визуализация: State Transition (Extended)
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> SCANNING: start_scan
+    SCANNING --> ATTACKING: target_found
+    ATTACKING --> SCANNING: capture_complete / timeout
+    SCANNING --> REPORTING: request_report
+    ATTACKING --> ERROR: hardware_failure / socket_error
+    SCANNING --> ERROR: nl80211_conflict
+    ERROR --> IDLE: manual_reset
+    REPORTING --> IDLE: finish_report
+```
 
-## Переходы Фазы 4
+### Разделение обязанностей:
+- **Python (Orchestrator)**: Занимается логикой состояний, обновлением TUI, записью в SQLite и управлением плагинами. Работает в одном потоке в рамках `asyncio` Event Loop.
+- **Rust (Worker)**: Занимается захватом пакетов, парсингом 802.11 в реальном времени и инъекцией. Работает в **отдельном нативном системном потоке** (`std::thread`), созданном через PyO3.
 
-Особый интерес представляет ветка `EvilTwin`. Когда вызывается атака `Attacking::EvilTwin`, физически происходит следующее:
+### Механизм взаимодействия:
+Rust-поток `sora-packet-engine` полностью независим от интерпретатора Python. Он пишет события в MPSC-канал (Crossbeam). Python-слой вызывает метод `poll()`, который лишь проверяет наличие готовых объектов в очереди. Это позволяет SORA обрабатывать тысячи пакетов в секунду на Rust-стороне, пока Python-интерфейс остается отзывчивым.
 
-1. **`evil_twin_waiting`**: Python переводит FSM в режим ожидания. Rust `BeaconCloner` начинает свою работу на заданном канале.
-2. `hostapd` и `dnsmasq` в этот момент **МОЛЧАТ**. Это железное правило архитектуры v4.4 — мы не запускаем злого двойника вслепую (вдруг оригинал не работает?).
-3. **`evil_twin_ready`**: Событие пробрасывается через `IPC High-Priority Channel` в Python. Оно содержит полный слепок Information Elements (IE).
-4. **Конфигурация**: FSM дергает `ConfigManager`, генерирует точный `hostapd.conf` и спавнит демоны. Двойник оживает.
+> [!TIP]  
+> **Performance Note**: Благодаря такой архитектуре, нагрузка на CPU со стороны Python-процесса минимальна (~2-5%), в то время как Rust-поток может утилизировать 100% ядра для решения задач захвата без блокировки UI.
 
-## Логика таймаутов
+## 2. Управление задачами AsyncIO
 
-В FSM встроена система таймаутов:
-- Если цель не обнаружена в `Scanning` за заданное время — возврат в `Idle`.
-- Если запущен `EvilTwin`, но событие `evil_twin_ready` не поступило в течение `waiting_timeout_ms` — FSM форсировано кидает исключение `adapter_error` и уходит в `Error` для сброса состояния (Fallback).
+`AttackController` интегрирован с `asyncio` для управления фоновыми операциями.
+
+### Жизненный цикл событий (fsm.py:L51)
+Метод `process_event` вызывается из основного цикла `run_tui`. 
+1. **Polling**: `asyncio` периодически проверяет `rx.poll_high()`.
+2. **Dispatch**: Если событие найдено, оно передается в `AttackController`.
+3. **State Change**: Если событие критическое (например, завершение хэндшейка), контроллер вызывает `_transition()`.
+
+### Graceful Cleanup (fsm.py:L159)
+При переходе в состояние `ERROR` или завершении сессии, контроллер запускает протокол очистки. Это гарантирует, что система не останется в нестабильном состоянии.
+- **Timeout**: На очистку отводится строго **3.0 секунды**.
+- **Последовательность**:
+    1. Остановка генераторов пакетов в Rust.
+    2. Снятие аппаратных блокировок (Channel Unlock).
+    3. Синхронизация и закрытие PCAP-файла.
+    4. Фиксация состояния в базе данных MetadataDB.
+    5. Уведомление внешних плагинов через Plugin Bus.
+
+## 3. Таблица состояний и переходов
+
+| Состояние | Описание | Допустимые переходы |
+| :--- | :--- | :--- |
+| **IDLE** | Ожидание команды пользователя | `SCANNING` |
+| **SCANNING** | Активный поиск целевой сети и сбор Beacon | `ATTACKING`, `REPORTING`, `ERROR` |
+| **ATTACKING** | Выполнение активных/пассивных атак | `SCANNING`, `REPORTING`, `ERROR` |
+| **REPORTING** | Генерация финального отчета | `IDLE` |
+| **ERROR** | Критическая ошибка (Hardware/Driver) | `IDLE` (после Reset) |
+
+> [!IMPORTANT]  
+> **Strict Technical Detail**: Любой переход состояния фиксируется в `_transition_log` с точностью до микросекунд (`time.time()`). Это позволяет проводить пост-эксплуатационный анализ (forensics) действий аудитора.

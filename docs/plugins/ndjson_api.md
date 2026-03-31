@@ -1,78 +1,72 @@
-# NDJSON Протокол (События и Команды)
+# Спецификация NDJSON API (Plugin Subprocess IPC)
 
-Взаимодействие SORA с плагинами осуществляется через **NDJSON (Newline Delimited JSON)** по стандартным потокам Ввода/Вывода (`stdin`, `stdout`). 
+В SORA архитектура плагинов реализована через **Subprocess IPC**, где обмен данными происходит по протоколу NDJSON. Это обеспечивает абсолютную изоляцию и возможность использования любого языка программирования без привязки к ABI Rust или GIL Python.
 
-Любой объект, отправленный плагином в `stdout`, воспринимается SORA как команда. Любой объект, отправленный SORA в `stdin` плагина, является событием из ядра.
+## 1. Схема Событий (SORA ➔ Plugin)
 
-> [!IMPORTANT]  
-> Каждая запись должна представлять собой ровно одну строку текста, завершающуюся символом `\n`. Пустые строки игнорируются. Сообщения, не являющиеся валидным JSON, логируются как `plugin_parse_error`.
+Все события передаются в `stdin` плагина. Событие — это одна JSON-строка, завершающаяся `\n`.
 
-## 1. События: SORA → Плагин (Observer)
-
-Все плагины по умолчанию являются "Наблюдателями" (Observers) и получают поток событий из Rust-ядра.
-
-### Начало и завершение сессии
-```json
-{"event": "session_start", "session_id": 12, "pcap_path": "sora_data/audit_2026.pcapng"}
-{"event": "session_stop", "session_id": 12, "status": "completed"}
-```
-
-### Захват Хэндшейков (EAPOL)
+### Схема `eapol_captured`
+Используется при захвате 4-way handshake (M1-M4).
 ```json
 {
-  "event": "eapol_captured",
-  "bssid": "AA:BB:CC:DD:EE:FF",
-  "client": "11:22:33:44:55:66",
-  "step": 2,
-  "pcap_offset": 1048576,
-  "data_hex": "010300..."
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "event":       {"const": "eapol_captured"},
+    "bssid":       {"type": "string", "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"},
+    "client":      {"type": "string", "pattern": "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"},
+    "step":        {"type": "integer", "minimum": 1, "maximum": 4},
+    "pcap_offset": {"type": "integer", "description": "Смещение в байтах в pcapng-файле"},
+    "data_hex":    {"type": "string", "description": "Сырые байты EAPOL в HEX формате"}
+  },
+  "required": ["event", "bssid", "client", "step", "data_hex"]
 }
 ```
 
-### Детектирование Изменений (BeaconCloner)
+### Схема `beacon_ie_changed`
+Уведомление об изменении параметров цели (например, смена канала или RSN).
 ```json
 {
   "event": "beacon_ie_changed",
-  "bssid": "AA:BB:CC:DD:EE:FF",
-  "changed_fields": ["ssid", "rsn_capabilities"]
+  "bssid": "...",
+  "changed_fields": ["ssid", "channel", "rsn"]
 }
 ```
 
-## 2. Команды: Плагин → SORA (Actor)
+## 2. Схема Команд (Plugin ➔ SORA)
 
-Плагины-акторы могут отправлять команды в ядро SORA для автоматизации атак или смены конфигурации "на лету".
+Команды отправляются в `stdout` плагина. SORA считывает их асинхронно.
 
-### Запуск Deauth атаки
+### Схема `cmd_start_deauth`
 ```json
 {
-  "command": "cmd_start_deauth",
-  "bssid": "AA:BB:CC:DD:EE:FF",
-  "client": "11:22:33:44:55:66",
-  "count": 5
+  "command":     "cmd_start_deauth",
+  "bssid":       "AA:BB:CC...",
+  "client":      "...",
+  "count":       10,
+  "interval_ms": 100
 }
 ```
 
-### Переключение канала
+## 3. Обработка Binary I/O (Internals)
+
+Для обеспечения надежности IPC уровня ядра Linux, SORA и плагины следуют строгим правилам работы с потоками:
+
+- **Line Buffering**: SORA читает `stdout` плагина построчно. Плагин **обязан** вызывать `flush()` после каждой записи (например, `sys.stdout.flush()` в Python), иначе команда "застрянет" в буфере до его переполнения.
+- **BrokenPipe Handling**: Если плагин завершается аварийно, пайп (`stdin`) закрывается. SORA детектирует `BrokenPipe` или `EPIPE` на уровне Rust/Python и инициирует событие `session_error` с последующим Cleanup-ом.
+- **Non-blocking read**: Оркестратор читает `stdout` плагинов в неблокирующем режиме через `asyncio.subprocess`, что предотвращает зависание основного цикла при "медленном" плагине.
+
+> [!WARNING]  
+> **Strict Technical Detail (Security)**: SORA ограничивает входной буфер для одного сообщения плагина (обычно 64 KB). Попытка отправить JSON большего размера приведет к принудительному закрытию пайпа из соображений защиты от DoS-атак на память оркестратора.
+
+## 4. Спецификация Статусов
+
+Плагины могут рапортовать о своем состоянии:
+- **`plugin_init`**: Стадия инициализации.
+- **`plugin_ready`**: Готовность к приему событий.
+- **`plugin_busy`**: Выполнение тяжелой операции (например, GPU cracking).
+
 ```json
-{
-  "command": "cmd_set_channel",
-  "channel": 11
-}
+{"type": "plugin_status", "status": "plugin_ready", "uptime_ms": 42000}
 ```
-
-### Остановка работы
-```json
-{"command": "cmd_shutdown", "reason": "all_targets_pwned"}
-```
-
-## 3. Статус и Логирование
-
-Плагины могут передавать свой статус и сообщения в консоль SORA:
-
-```json
-{"type": "plugin_log", "level": "INFO", "message": "Portal server started on port 8080"}
-{"type": "plugin_status", "status": "running", "uptime": 120}
-```
-
-> [!CAUTION]  
-> **Strict Compliance Statement**: Использование командного API плагинами должно быть строго регламентировано в рамках аудита. Любая неконтролируемая инъекция пакетов (Deauth, Beacon Flood) может привести к нестабильности систем связи за пределами зоны тестирования.

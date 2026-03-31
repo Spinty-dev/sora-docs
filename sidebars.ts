@@ -41,6 +41,7 @@ const sidebars: SidebarsConfig = {
         'rust/tx_queue',
         'rust/nl80211',
         'rust/adapter_layer',
+        'rust/security',
       ],
     },
     {
@@ -50,6 +51,7 @@ const sidebars: SidebarsConfig = {
         'python/overview',
         'python/fsm',
         'python/config_manager',
+        'python/persistence',
       ],
     },
     {
@@ -66,6 +68,13 @@ const sidebars: SidebarsConfig = {
         'plugins/overview',
         'plugins/ndjson_api',
         'plugins/creating_plugin',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Диагностика (Advanced)',
+      items: [
+        'debugging',
       ],
     },
   ],
