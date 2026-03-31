@@ -1,0 +1,38 @@
+{
+  "link.title.Документация": {
+    "message": "Documentation",
+    "description": "The title of the footer links column with title=Документация in the footer"
+  },
+  "link.title.Сообщество": {
+    "message": "Community",
+    "description": "The title of the footer links column with title=Сообщество in the footer"
+  },
+  "link.title.Инфо": {
+    "message": "Info",
+    "description": "The title of the footer links column with title=Инфо in the footer"
+  },
+  "link.item.label.Архитектура": {
+    "message": "Architecture",
+    "description": "The label of footer link with label=Архитектура linking to /docs/SORA_architecture_v4_4"
+  },
+  "link.item.label.Compliance": {
+    "message": "Compliance",
+    "description": "The label of footer link with label=Compliance linking to /docs/COMPLIANCE"
+  },
+  "link.item.label.Disclaimer": {
+    "message": "Disclaimer",
+    "description": "The label of footer link with label=Disclaimer linking to /docs/DISCLAIMER"
+  },
+  "link.item.label.GitHub Issues": {
+    "message": "GitHub Issues",
+    "description": "The label of footer link with label=GitHub Issues linking to https://github.com/Spinty-dev/SORA/issues"
+  },
+  "link.item.label.GitHub": {
+    "message": "GitHub",
+    "description": "The label of footer link with label=GitHub linking to https://github.com/Spinty-dev/SORA"
+  },
+  "copyright": {
+    "message": "Copyright © 2026 Spinty. Built with Docusaurus.",
+    "description": "The footer copyright"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "title": {
+    "message": "SORA",
+    "description": "The title in the navbar"
+  },
+  "logo.alt": {
+    "message": "SORA Logo",
+    "description": "The alt text of navbar logo"
+  },
+  "item.label.Документация": {
+    "message": "Documentation",
+    "description": "Navbar item with label Документация"
+  },
+  "item.label.GitHub (Core)": {
+    "message": "GitHub (Core)",
+    "description": "Navbar item with label GitHub (Core)"
+  }
+}

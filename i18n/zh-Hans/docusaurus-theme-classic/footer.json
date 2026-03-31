@@ -1,0 +1,38 @@
+{
+  "link.title.Документация": {
+    "message": "文档",
+    "description": "The title of the footer links column with title=Документация in the footer"
+  },
+  "link.title.Сообщество": {
+    "message": "社区",
+    "description": "The title of the footer links column with title=Сообщество in the footer"
+  },
+  "link.title.Инфо": {
+    "message": "信息",
+    "description": "The title of the footer links column with title=Инфо in the footer"
+  },
+  "link.item.label.Архитектура": {
+    "message": "架构",
+    "description": "The label of footer link with label=Архитектура linking to /docs/SORA_architecture_v4_4"
+  },
+  "link.item.label.Compliance": {
+    "message": "合规性",
+    "description": "The label of footer link with label=Compliance linking to /docs/COMPLIANCE"
+  },
+  "link.item.label.Disclaimer": {
+    "message": "免责声明",
+    "description": "The label of footer link with label=Disclaimer linking to /docs/DISCLAIMER"
+  },
+  "link.item.label.GitHub Issues": {
+    "message": "GitHub 问题",
+    "description": "The label of footer link with label=GitHub Issues linking to https://github.com/Spinty-dev/SORA/issues"
+  },
+  "link.item.label.GitHub": {
+    "message": "GitHub",
+    "description": "The label of footer link with label=GitHub linking to https://github.com/Spinty-dev/SORA"
+  },
+  "copyright": {
+    "message": "Copyright © 2026 Spinty. 使用 Docusaurus 构建。",
+    "description": "The footer copyright"
+  }
+}

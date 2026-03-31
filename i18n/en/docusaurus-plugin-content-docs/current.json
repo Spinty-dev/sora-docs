@@ -1,0 +1,34 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.tutorialSidebar.category.Введение (Overview)": {
+    "message": "Overview",
+    "description": "The label for category 'Введение (Overview)' in sidebar 'tutorialSidebar'"
+  },
+  "sidebar.tutorialSidebar.category.Комплаенс (Legal & Compliance)": {
+    "message": "Legal & Compliance",
+    "description": "The label for category 'Комплаенс (Legal & Compliance)' in sidebar 'tutorialSidebar'"
+  },
+  "sidebar.tutorialSidebar.category.Ядро и Сеть (Rust Layer)": {
+    "message": "Rust Core Layer",
+    "description": "The label for category 'Ядро и Сеть (Rust Layer)' in sidebar 'tutorialSidebar'"
+  },
+  "sidebar.tutorialSidebar.category.Оркестрация (Python Layer)": {
+    "message": "Python Orchestrator",
+    "description": "The label for category 'Оркестрация (Python Layer)' in sidebar 'tutorialSidebar'"
+  },
+  "sidebar.tutorialSidebar.category.Связь (IPC)": {
+    "message": "IPC & Bridging",
+    "description": "The label for category 'Связь (IPC)' in sidebar 'tutorialSidebar'"
+  },
+  "sidebar.tutorialSidebar.category.Плагины (NDJSON Events)": {
+    "message": "NDJSON Plugins",
+    "description": "The label for category 'Плагины (NDJSON Events)' in sidebar 'tutorialSidebar'"
+  },
+  "sidebar.tutorialSidebar.category.Диагностика (Advanced)": {
+    "message": "Advanced Diagnostics",
+    "description": "The label for category 'Диагностика (Advanced)' in sidebar 'tutorialSidebar'"
+  }
+}
