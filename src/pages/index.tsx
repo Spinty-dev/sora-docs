@@ -3,7 +3,6 @@ import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
-import HomepageFeatures from '@site/src/components/HomepageFeatures';
 import Heading from '@theme/Heading';
 
 import styles from './index.module.css';
@@ -20,8 +19,14 @@ function HomepageHeader() {
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/docs/intro">
-            Docusaurus Tutorial - 5min ⏱️
+            to="/docs/SORA_architecture_v4_4">
+            Читать Архитектуру ➔
+          </Link>
+          <Link
+            className="button button--outline button--secondary button--lg"
+            style={{marginLeft: '20px'}}
+            to="/docs/COMPLIANCE">
+            Compliance ➔
           </Link>
         </div>
       </div>
@@ -33,11 +38,15 @@ export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`Hello from ${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />">
+      title={`Advanced Security Auditor`}
+      description="Spinty SORA - Signals Offensive Radio Auditor">
       <HomepageHeader />
       <main>
-        <HomepageFeatures />
+        {/* Placeholder for future features or terminal simulation UI */}
+        <div style={{padding: '4rem 0', textAlign: 'center', opacity: 0.7}}>
+            <h2>Offensive RF auditing for the modern era.</h2>
+            <p>Phase 4 Architecture (Rust Core + Python Orchestration)</p>
+        </div>
       </main>
     </Layout>
   );

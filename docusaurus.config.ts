@@ -37,10 +37,7 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/Spinty-dev/sora-docs/tree/main/',
         },
-        blog: {
-          showReadingTime: true,
-          editUrl: 'https://github.com/Spinty-dev/sora-docs/tree/main/',
-        },
+        blog: false,
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -67,7 +64,6 @@ const config: Config = {
           position: 'left',
           label: 'Документация',
         },
-        {to: '/blog', label: 'Блог', position: 'left'},
         {
           href: 'https://github.com/Spinty-dev/SORA',
           label: 'GitHub (Core)',
@@ -99,7 +95,6 @@ const config: Config = {
         {
           title: 'Инфо',
           items: [
-            {label: 'Блог', to: '/blog'},
             {label: 'GitHub', href: 'https://github.com/Spinty-dev/SORA'},
           ],
         },
