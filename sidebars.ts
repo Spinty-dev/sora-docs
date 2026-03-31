@@ -52,6 +52,7 @@ const sidebars: SidebarsConfig = {
         'python/fsm',
         'python/config_manager',
         'python/persistence',
+        'python/tui_internals',
       ],
     },
     {
@@ -59,6 +60,7 @@ const sidebars: SidebarsConfig = {
       label: 'Связь (IPC)',
       items: [
         'ipc/architecture',
+        'ipc/error_bridge',
       ],
     },
     {
@@ -75,6 +77,7 @@ const sidebars: SidebarsConfig = {
       label: 'Диагностика (Advanced)',
       items: [
         'debugging',
+        'profiling',
       ],
     },
   ],
