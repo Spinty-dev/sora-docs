@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkwebsite=globalThis.webpackChunkwebsite||[]).push([[1903],{1912(s){s.exports=JSON.parse('{"blogBasePath":"/sora-docs/en/blog","blogTitle":"Blog","authorsListPath":"/sora-docs/en/blog/authors"}')}}]);
