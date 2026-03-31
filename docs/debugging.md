@@ -19,8 +19,9 @@ sudo strace -p $(pgrep sora) -f -e network -s 64
 - **Диагностика**: Кратковременно запустите `tcpdump -i wlan0mon -n`. Если `tcpdump` видит пакеты, а SORA нет — проблема в `sockaddr_ll` привязке (см. `af_packet.rs`).
 - **Конфликт nl80211**: Если `strace` показывает `EBUSY` на вызовах `sendto` в Netlink-сокет — проверьте наличие процесса `wpa_supplicant`. 
 
-> [!TIP]  
-> **Chairman's Tip**: Используйте `strace -e ioctl`, если интерфейс не переходит в UP. Ищите ошибку `EPERM` — это верный признак того, что `capabilities` не проброшены в Python-процесс.
+:::tip
+**Chairman's Tip**: Используйте `strace -e ioctl`, если интерфейс не переходит в UP. Ищите ошибку `EPERM` — это верный признак того, что `capabilities` не проброшены в Python-процесс.
+:::
 
 ## 2. Отладка Rust-ядра через GDB
 
@@ -56,8 +57,9 @@ iw dev wlan0mon info
 - Проверьте `dmesg | grep nl80211`.
 - Некоторые драйверы Intel (iwlwifi) не позволяют жестко фиксировать канал, если запущен `NetworkManager`. Используйте `airmon-ng check kill`.
 
-> [!IMPORTANT]  
-> **Strict Technical Detail**: Всегда проверяйте версию ядра `uname -a`. SORA оптимизирована для ядер 5.15+, где исправлены многие баги Netlink атрибутов для 802.11ax (Wi-Fi 6).
+:::info
+**Strict Technical Detail**: Всегда проверяйте версию ядра `uname -a`. SORA оптимизирована для ядер 5.15+, где исправлены многие баги Netlink атрибутов для 802.11ax (Wi-Fi 6).
+:::
 
 ## 4. Системная отладка (System Troubleshooting)
 
@@ -92,5 +94,6 @@ sudo killall hostapd
 - **Sora PID**: Основной процесс.
 - **hostapd PID**: Дочерний процесс, управляемый `ConfigManager`.
 
-> [!TIP]  
-> **Advanced Note**: Если вы видите ошибку `Device or resource busy`, проверьте `rfkill list` и убежитесь, что `NetworkManager` или `wpa_supplicant` не пытаются захватить интерфейс в монопольный режим.
+:::tip
+**Advanced Note**: Если вы видите ошибку `Device or resource busy`, проверьте `rfkill list` и убежитесь, что `NetworkManager` или `wpa_supplicant` не пытаются захватить интерфейс в монопольный режим.
+:::

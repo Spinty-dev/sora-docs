@@ -24,8 +24,9 @@ pub fn to_py_dict(&self, py: Python<'_>) -> PyResult<PyObject> {
 | `i8 / u8` | `int` | Прямое приведение | Value Copy |
 | `Vec<u8>` | `bytes` | `as_slice()` | **Zero-Copy Reference** |
 
-> [!NOTE]  
-> **Optimization**: Для передачи сырых данных пакетов (`EapolFrame.data`) мы используем `as_slice()`, что позволяет Python создать `bytes`-объект прямо из буфера Rust без промежуточного копирования через HEX-строку.
+:::info
+**Optimization**: Для передачи сырых данных пакетов (`EapolFrame.data`) мы используем `as_slice()`, что позволяет Python создать `bytes`-объект прямо из буфера Rust без промежуточного копирования через HEX-строку.
+:::
 
 ## 2. PyO3 Memory Bridge (Ownership)
 

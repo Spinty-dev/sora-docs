@@ -6,8 +6,9 @@ English | [Русский](docs/README_RU.md) | [中文](docs/README_ZH.md)
 
 **SORA** is a high-performance framework for deep wireless (Wi-Fi) security auditing and penetration testing. Designed with a focus on ultra-low jitter, stealth, and maximum flexibility, SORA combines the power of Rust at the system level with Python for orchestration.
 
-> [!CAUTION]
-> **WARNING:** This tool is intended for educational purposes and authorized security auditing ONLY. Before use, read the [Legal Disclaimer](DISCLAIMER.md).
+:::danger
+**WARNING:** This tool is intended for educational purposes and authorized security auditing ONLY. Before use, read the [Legal Disclaimer](DISCLAIMER.md).
+:::
 
 ---
 

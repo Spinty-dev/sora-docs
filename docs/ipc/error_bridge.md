@@ -37,8 +37,9 @@ except RuntimeError as e:
     - При попытке отправить команду Python получит `RuntimeError: command channel disconnected`.
 4. **FSM Transition**: `AttackController` переводит систему в состояние `ERROR` и запускает протокол очистки.
 
-> [!WARNING]  
-> **Strict Technical Note**: Хотя PyO3 пытается поймать паники (если включена фича `catch-unwind`), SORA полагается на изоляцию потоков. Любая паника в Rust должна рассматриваться как критический баг ядра, требующий анализа логов `dmesg` или `stderr`.
+:::warning
+**Strict Technical Note**: Хотя PyO3 пытается поймать паники (если включена фича `catch-unwind`), SORA полагается на изоляцию потоков. Любая паника в Rust должна рассматриваться как критический баг ядра, требующий анализа логов `dmesg` или `stderr`.
+:::
 
 ## 3. Диагностика через Status Codes
 
