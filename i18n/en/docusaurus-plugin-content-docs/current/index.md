@@ -61,7 +61,7 @@ cd SORA
 
 ## 🏗 Architecture
 
-Detailed internal documentation, IPC schemas, and attack engine logic can be found in [SORA Architecture v4.4](SORA_architecture_v4_4.md). For information on wireless auditing standards and regulatory compliance, see [Compliance & Standards](COMPLIANCE.md).
+For information on wireless auditing standards and regulatory compliance, see [Compliance & Standards](COMPLIANCE.md).
 
 ---
 

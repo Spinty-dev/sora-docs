@@ -61,7 +61,7 @@ cd SORA
 
 ## 🏗 架构
 
-详细的内部文档、IPC 架构和攻击引擎逻辑可以在 [SORA 架构 v4.4](SORA_architecture_v4_4.md) 中找到。有关无线审计标准和监管合规性的信息，请参阅 [合规性与标准](COMPLIANCE.md)。
+有关无线审计标准和监管合规性的信息，请参阅 [合规性与标准](COMPLIANCE.md)。
 
 ---
 

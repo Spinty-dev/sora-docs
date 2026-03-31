@@ -81,7 +81,6 @@ const config: Config = {
         {
           title: 'Документация',
           items: [
-            {label: 'Архитектура', to: '/docs/SORA_architecture_v4_4'},
             {label: 'Compliance', to: '/docs/COMPLIANCE'},
             {label: 'Disclaimer', to: '/docs/DISCLAIMER'},
           ],

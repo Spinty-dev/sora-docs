@@ -19,7 +19,6 @@ const sidebars: SidebarsConfig = {
       label: 'Введение (Overview)',
       items: [
         'index',
-        'SORA_architecture_v4_4',
         'architecture/packet_lifecycle',
       ],
     },

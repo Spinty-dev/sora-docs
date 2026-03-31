@@ -19,8 +19,8 @@ function HomepageHeader() {
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/docs/SORA_architecture_v4_4">
-            Читать Архитектуру ➔
+            to="/docs/">
+            Документация ➔
           </Link>
           <Link
             className="button button--outline button--secondary button--lg"
