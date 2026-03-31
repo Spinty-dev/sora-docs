@@ -39,6 +39,7 @@ const sidebars: SidebarsConfig = {
         'rust/overview',
         'rust/packet_engine',
         'rust/tx_queue',
+        'rust/low_level',
       ],
     },
     {
